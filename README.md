@@ -36,10 +36,10 @@ For GPT-5 family models add `--wire-api responses` to the profile.
 
 ## Troubleshooting
 
-- **`No response was returned` and nothing in the gateway log**: Copilot never called the gateway. Aliases are not in
-  Copilot's model catalog, so `byom copilot` passes explicit token limits. If your Copilot setup loads many MCP servers,
-  skills or plugins, the static context can exceed a 128k model's budget. Use a larger-context deployment (for example
-  `gpt-4.1`) or test with a clean profile: `$env:COPILOT_HOME = "$env:TEMP\copilot-clean"`.
+- **`Invalid 'tools': array too long ... maximum length 128`** (visible in the gateway log, or as `No response was
+  returned` in Copilot): Azure OpenAI accepts at most 128 tools per request. Copilot sends every built-in, MCP and plugin
+  tool, so a profile with many MCP servers easily exceeds this (381 in one real setup). Use `byom copilot --lean <alias>`
+  (separate minimal Copilot home) or disable MCP servers/plugins. Context size was not the cause.
 - **`UnicodeEncodeError` when the gateway starts on Windows**: `byom serve` already forces `PYTHONUTF8=1`.
 - **Sign-in**: `byom login` uses device code flow (no browser window needed); tokens are cached per profile.
 
@@ -47,7 +47,7 @@ For GPT-5 family models add `--wire-api responses` to the profile.
 
 - Your identity needs *Cognitive Services Contributor* (manage deployments and read keys) on the account.
 - Models must support streaming and tool calling (128k+ context recommended).
-- Status: early. Verified end to end: device-code login, listing, `sync`, `serve` and a Copilot CLI prompt answered by an Azure OpenAI deployment (`gpt-4o-mini`, chat completions) in a personal tenant. Still to verify: GPT-5 via the Responses API, non-OpenAI Foundry models (`azure_ai/`).
+- Status: early. Verified end to end in a personal tenant: device-code login, listing, deploying, `sync`, `serve`, and Copilot CLI prompts answered by Azure OpenAI deployments `gpt-4o-mini`, `gpt-4.1` and `gpt-5` (chat completions). Anthropic models need a subscription with a valid payment method (Marketplace billing); a Visual Studio credit subscription is rejected. Still to verify: non-OpenAI Foundry models end to end, and the Responses API.
 
 ## Documentation
 

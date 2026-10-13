@@ -61,8 +61,21 @@ def deploy(
     fmt: str = typer.Option("OpenAI", "--format", help="Model format/publisher"),
     sku: str = typer.Option("GlobalStandard"),
     capacity: int = typer.Option(10),
+    org_name: str = typer.Option(None, help="Anthropic models: organization name"),
+    industry: str = typer.Option(None, help="Anthropic models: industry"),
+    country: str = typer.Option(None, help="Anthropic models: ISO country code, e.g. BE"),
 ):
-    foundry.deploy(get_profile(profile), name, model, version, fmt, sku, capacity)
+    provider_data = None
+    if org_name or industry or country:
+        if not (org_name and industry and country):
+            typer.echo("--org-name, --industry and --country must be given together.")
+            raise typer.Exit(1)
+        provider_data = {
+            "organizationName": org_name,
+            "industry": industry,
+            "countryCode": country,
+        }
+    foundry.deploy(get_profile(profile), name, model, version, fmt, sku, capacity, provider_data)
     typer.echo(f"Deployed {name}. Run 'byom sync' to refresh the gateway config.")
 
 
@@ -116,7 +129,16 @@ def serve():
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-def copilot(ctx: typer.Context, model_alias: str):
+def copilot(
+    ctx: typer.Context,
+    model_alias: str,
+    lean: bool = typer.Option(
+        False,
+        "--lean",
+        help="Use a separate, minimal Copilot home (no MCP servers/plugins) to stay under "
+        "Azure OpenAI's 128-tool limit.",
+    ),
+):
     """Launch Copilot CLI against the gateway with the given model alias (profile-deployment)."""
     exe = shutil.which("copilot")
     if not exe:
@@ -127,6 +149,10 @@ def copilot(ctx: typer.Context, model_alias: str):
         if model_alias.startswith(name + "-"):
             wire = p.wire_api
     env = {**os.environ, **gateway.copilot_env(model_alias, wire)}
+    if lean:
+        lean_home = home() / "copilot-lean"
+        lean_home.mkdir(exist_ok=True)
+        env["COPILOT_HOME"] = str(lean_home)
     raise typer.Exit(subprocess.call([exe, *ctx.args], env=env))
 
 

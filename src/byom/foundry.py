@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import requests
 from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
 from azure.mgmt.cognitiveservices.models import (
     Deployment,
@@ -10,7 +11,7 @@ from azure.mgmt.cognitiveservices.models import (
     Sku,
 )
 
-from .auth import credential
+from .auth import ARM_SCOPE, credential
 from .config import Profile
 
 
@@ -30,7 +31,10 @@ def deploy(
     fmt: str = "OpenAI",
     sku: str = "GlobalStandard",
     capacity: int = 10,
+    provider_data: dict | None = None,
 ):
+    if provider_data:
+        return _deploy_rest(profile, name, model, version, fmt, sku, capacity, provider_data)
     properties = DeploymentProperties(
         model=DeploymentModel(format=fmt, name=model, version=version)
     )
@@ -44,6 +48,27 @@ def deploy(
         )
         .result()
     )
+
+
+def _deploy_rest(profile, name, model, version, fmt, sku, capacity, provider_data):
+    """Call ARM directly: the SDK lacks modelProviderData, which Anthropic models require."""
+    token = credential(profile).get_token(ARM_SCOPE).token
+    url = (
+        f"https://management.azure.com/subscriptions/{profile.subscription_id}"
+        f"/resourceGroups/{profile.resource_group}/providers/Microsoft.CognitiveServices"
+        f"/accounts/{profile.account}/deployments/{name}?api-version=2025-10-01-preview"
+    )
+    body = {
+        "sku": {"name": sku, "capacity": capacity},
+        "properties": {
+            "model": {"format": fmt, "name": model, "version": version},
+            "modelProviderData": provider_data,
+        },
+    }
+    resp = requests.put(url, json=body, headers={"Authorization": f"Bearer {token}"}, timeout=60)
+    if not resp.ok:
+        raise RuntimeError(f"Deployment failed ({resp.status_code}): {resp.text}")
+    return resp.json()
 
 
 def delete(profile: Profile, name: str) -> None:
