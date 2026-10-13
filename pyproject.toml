@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "copilot-byom-selector"
+version = "0.1.0"
+description = "Local LiteLLM gateway and Azure AI Foundry manager for GitHub Copilot CLI (BYOK), with multi-tenant profiles."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "azure-identity>=1.17",
+    "azure-mgmt-cognitiveservices>=13.5",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+gateway = ["litellm[proxy]>=1.50"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+byom = "byom.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/byom"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

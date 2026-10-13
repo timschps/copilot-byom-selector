@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Local, possibly sensitive configuration
+profiles.yaml
+litellm.config.yaml
+*.key
+*.local.bicepparam
