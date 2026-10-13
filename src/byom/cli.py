@@ -8,7 +8,7 @@ import sys
 
 import typer
 
-from . import auth, foundry, gateway
+from . import auth, foundry, gateway, state
 from .config import Profile, get_profile, home, load_profiles, save_profiles
 
 app = typer.Typer(
@@ -95,6 +95,34 @@ def sync():
     typer.echo(f"{len(entries)} models written to {path}")
     for e in entries:
         typer.echo(f"  {e['model_name']}")
+    active = state.ensure_active()
+    typer.echo(f"Active model: {active or 'none'}")
+
+
+@app.command()
+def use(alias: str):
+    """Switch the model behind 'byom-active' (takes effect on the next request)."""
+    try:
+        state.set_active(alias)
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(1) from None
+    typer.echo(f"Active model: {alias}")
+
+@app.command()
+def status():
+    """List selectable models and mark the active one."""
+    active = state.get_active()
+    for a in state.list_aliases():
+        typer.echo(f"{'*' if a == active else ' '} {a}")
+
+
+@app.command()
+def mcp():
+    """Run the MCP server (stdio) so Copilot can list and switch models."""
+    from . import mcp_server
+
+    mcp_server.main()
 
 
 @app.command()
@@ -131,7 +159,9 @@ def serve():
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def copilot(
     ctx: typer.Context,
-    model_alias: str,
+    model_alias: str = typer.Argument(
+        state.ACTIVE_ALIAS, help="Model alias; default 'byom-active' is switchable in-session."
+    ),
     lean: bool = typer.Option(
         False,
         "--lean",
@@ -145,8 +175,9 @@ def copilot(
         typer.echo("copilot CLI not found on PATH")
         raise typer.Exit(1)
     wire = "completions"
+    target = state.resolve(model_alias) or model_alias
     for name, p in load_profiles().items():
-        if model_alias.startswith(name + "-"):
+        if target.startswith(name + "-"):
             wire = p.wire_api
     env = {**os.environ, **gateway.copilot_env(model_alias, wire)}
     if lean:

@@ -60,7 +60,10 @@ def write_config(entries: list[dict]):
             {
                 "model_list": entries,
                 "general_settings": {"master_key": GATEWAY_KEY},
-                "litellm_settings": {"drop_params": True},
+                "litellm_settings": {
+                    "drop_params": True,
+                    "callbacks": ["byom.hook.proxy_handler_instance"],
+                },
             },
             sort_keys=False,
         ),
