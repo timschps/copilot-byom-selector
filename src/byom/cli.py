@@ -263,7 +263,7 @@ def copilot(
         "Azure OpenAI's 128-tool limit.",
     ),
     max_prompt_tokens: int = typer.Option(
-        128000,
+        400000,
         "--max-prompt-tokens",
         help="Context budget Copilot assumes. Raise it (e.g. 400000) for large-context models "
         "when many MCP tools are loaded; keep it below the smallest model you will switch to.",
