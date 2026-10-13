@@ -18,6 +18,7 @@ def test_use_and_resolve(byom_home):
     state.set_active("priv-b")
     assert state.resolve(state.ACTIVE_ALIAS) == "priv-b"
     assert state.resolve("priv-a") == "priv-a"
+    assert state.resolve("gpt-5.4-nano") == "priv-b"  # Copilot's own helper model names
     assert json.loads((byom_home / "active.json").read_text())["alias"] == "priv-b"
 
 

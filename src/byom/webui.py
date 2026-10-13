@@ -88,7 +88,10 @@ background:var(--card);color:var(--ink)}button.on{background:var(--acc);color:#f
 <div class=card><h2>Usage per model</h2><div id=usage></div></div>
 <div class=card><h2>Deployed</h2><div id=deployed></div></div>
 <div class=card style="grid-column:1/-1"><h2>Available to deploy</h2>
-<div id=catalog class=mut>Loading catalog...</div></div></div>
+<div id=catalog class=mut>Loading catalog...</div></div>
+<div class=card id=cli style="grid-column:1/-1;display:none"><h2>Deploy with the CLI</h2>
+<pre id=clitext style="white-space:pre-wrap;margin:0 0 .6rem"></pre>
+<button onclick="copyCli()">Copy</button> <span id=clinote class=mut></span></div></div>
 <p class=mut>Costs are estimates from a local price table, not your Azure invoice.</p>
 <script>
 const $=id=>document.getElementById(id), fmt=n=>(n||0).toLocaleString();
@@ -116,10 +119,27 @@ async function load(){
  if(!catalogLoaded){catalogLoaded=true;profile=d.deployments[0]?.profile;
   if(profile){const c=await j('/api/catalog?profile='+profile);
    const have=new Set(d.deployments.map(x=>x.model.split(' ')[0]));
+   CAT=c.filter(i=>!have.has(i.name));
    $('catalog').innerHTML='<table><tr><th>Model</th><th>Provider</th><th>Version</th><th>SKUs</th><th></th></tr>'+
-   c.filter(i=>!have.has(i.name)).map((i,n)=>'<tr><td>'+i.name+'</td><td>'+i.format+'</td><td>'+i.version+'</td><td class=mut>'+i.skus.join(', ')+'</td><td>'+
-   (i.format=='OpenAI'?'<button onclick=\\'deploy("'+profile+'",'+JSON.stringify(i).replace(/'/g,'')+')\\'>Deploy</button>':'<span class=mut>via CLI</span>')+'</td></tr>').join('')+'</table>'}}
+   CAT.map((i,n)=>'<tr><td>'+i.name+'</td><td>'+i.format+'</td><td>'+i.version+'</td><td class=mut>'+i.skus.join(', ')+'</td><td>'+
+   (i.format=='OpenAI'?'<button onclick="deploy(profile,CAT['+n+'])">Deploy</button> ':'')+
+   '<button onclick="showCli('+n+')">CLI command</button></td></tr>').join('')+'</table>'}}
 }
+function cliCmd(i){
+ const slug=i.name.toLowerCase().replace(/[^a-z0-9-]/g,'-');
+ let c='byom deploy '+profile+' '+slug+' --model '+i.name+' --version '+i.version+' --format '+i.format;
+ if(i.skus.length&&!i.skus.includes('GlobalStandard'))c+=' --sku '+i.skus[0];
+ if(i.format=='Anthropic')c+=' --org-name "<your org>" --industry <industry> --country <ISO code, e.g. BE>';
+ return c+'\\nbyom sync   # then restart byom copilot so the gateway picks up the new model'}
+function showCli(n){
+ const i=CAT[n],c=cliCmd(i);
+ $('cli').style.display='block';
+ $('clitext').textContent=c;
+ $('clinote').textContent=i.format=='Anthropic'?'Anthropic models need organization details and an Azure Marketplace-enabled subscription (a payment method on the subscription).':
+  i.format=='OpenAI'?'You can also use the Deploy button.':'Non-OpenAI, non-Anthropic models are deployed here but are not verified to work through the gateway yet.';
+ $('cli').scrollIntoView({behavior:'smooth'})}
+function copyCli(){navigator.clipboard.writeText($('clitext').textContent)}
+let CAT=[];
 load();setInterval(load,4000);
 </script>"""
 

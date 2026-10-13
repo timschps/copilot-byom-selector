@@ -45,6 +45,8 @@ Usage lives in `~/.byom/usage.db`. Costs are estimates from a local price table 
 
 ## Troubleshooting
 
+- **Many MCP servers/plugins (hundreds of tools):** Azure OpenAI accepts at most 128 tools per request. The gateway filters automatically (built-in tools first, then tools used earlier in the conversation, then relevance to your last message; tune via `~/.byom/tools.yaml` with `max_tools`, `always_keep`, `deny`). Copilot also checks tool definitions against its context budget before sending, so start with a higher budget: `byom copilot --max-prompt-tokens 400000` (keep it below the smallest model you will switch to). `--lean` remains the fully minimal alternative.
+
 - **`Invalid 'tools': array too long ... maximum length 128`** (visible in the gateway log, or as `No response was
   returned` in Copilot): Azure OpenAI accepts at most 128 tools per request. Copilot sends every built-in, MCP and plugin
   tool, so a profile with many MCP servers easily exceeds this (381 in one real setup). Use `byom copilot --lean <alias>`

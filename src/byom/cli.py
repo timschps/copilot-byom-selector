@@ -235,6 +235,12 @@ def copilot(
         help="Use a separate, minimal Copilot home (no MCP servers/plugins) to stay under "
         "Azure OpenAI's 128-tool limit.",
     ),
+    max_prompt_tokens: int = typer.Option(
+        128000,
+        "--max-prompt-tokens",
+        help="Context budget Copilot assumes. Raise it (e.g. 400000) for large-context models "
+        "when many MCP tools are loaded; keep it below the smallest model you will switch to.",
+    ),
 ):
     """Launch Copilot CLI against the gateway with the given model alias (profile-deployment)."""
     exe = shutil.which("copilot")
@@ -250,7 +256,7 @@ def copilot(
     for name, p in load_profiles().items():
         if target.startswith(name + "-"):
             wire = p.wire_api
-    env = {**os.environ, **gateway.copilot_env(model_alias, wire)}
+    env = {**os.environ, **gateway.copilot_env(model_alias, wire, max_prompt_tokens)}
     sid = usage.start_session(os.getcwd())
     env["COPILOT_PROVIDER_HEADERS"] = f"X-Byom-Session: {sid}"
     if lean:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from litellm.integrations.custom_logger import CustomLogger
 
-from . import usage
+from . import toolfilter, usage
 from .state import resolve
 
 SESSION_HEADER = "x-byom-session"
@@ -25,6 +25,13 @@ def _alias(kwargs: dict) -> str:
 class ActiveModelHook(CustomLogger):
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
         data["model"] = resolve(data.get("model"))
+        tools = data.get("tools")
+        cfg = toolfilter.load_config()
+        if tools and not any(s in str(data["model"]) for s in cfg["skip_models"]):
+            kept, dropped = toolfilter.filter_tools(tools, data.get("messages") or [], cfg)
+            if dropped:
+                data["tools"] = kept
+                print(f"[byom] tool filter: kept {len(kept)}, dropped {len(dropped)}", flush=True)
         return data
 
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):

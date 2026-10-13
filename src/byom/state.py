@@ -51,7 +51,7 @@ def ensure_active() -> str | None:
 
 
 def resolve(model: str | None) -> str | None:
-    """Map the virtual alias to the currently selected backend; leave other names untouched."""
-    if model == ACTIVE_ALIAS:
-        return get_active() or model
-    return model
+    """Map the virtual alias, and model names Copilot picks by itself, to the active backend."""
+    if model and model != ACTIVE_ALIAS and model in list_aliases():
+        return model
+    return (get_active() or model) if model else model
