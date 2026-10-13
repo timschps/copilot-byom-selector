@@ -79,7 +79,11 @@ border-bottom:1px solid var(--bd)}th{color:var(--mut);font-weight:500}td.n{text-
 button{font:inherit;cursor:pointer;border:1px solid var(--bd);border-radius:7px;padding:.25rem .6rem;
 background:var(--card);color:var(--ink)}button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .dot{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;background:#bbb;margin-right:.4rem}
-.dot.live{background:var(--acc)}.mut{color:var(--mut)}select{font:inherit;padding:.2rem}
+.dot.live{background:var(--acc)}.mut{color:var(--mut)}select{font:inherit;padding:.3rem .5rem;border:1px solid var(--bd);border-radius:7px;background:var(--card);
+color:var(--ink);max-width:100%}.id{font-family:ui-monospace,Consolas,monospace;font-size:.85rem}
+td.nw{white-space:nowrap}tr.closed td{opacity:.55}.card{overflow-x:auto}
+input[type=text],input:not([type]){font:inherit;padding:.3rem .5rem;border:1px solid var(--bd);border-radius:7px;
+background:var(--card);color:var(--ink)}button:hover{border-color:var(--acc)}
 </style>
 <h1>Copilot BYOM</h1><div class=kpis id=kpis></div>
 <div class=grid>
@@ -97,7 +101,7 @@ background:var(--card);color:var(--ink)}button.on{background:var(--acc);color:#f
 <script>
 const $=id=>document.getElementById(id), fmt=n=>(n||0).toLocaleString();
 const usd=n=>'$'+(n||0).toFixed(3);
-let profile=null,catalogLoaded=false;
+let showClosed=false,profile=null,catalogLoaded=false;
 async function j(u,o){return (await fetch(u,o)).json()}
 async function useFor(sid,a){await fetch('/api/use',{method:'POST',body:sid+'|'+a});load()}
 async function use(a){await fetch('/api/use',{method:'POST',body:a});load()}
@@ -116,14 +120,17 @@ async function loadProfiles(){
   '<div class=mut>Models appear as <i>prefix-model</i>. Saving rewrites the aliases.</div>'}
 let profilesLoaded=false;
 async function load(){
+ if(document.activeElement&&document.activeElement.tagName=='SELECT')return;
  if(!profilesLoaded){profilesLoaded=true;loadProfiles()}
  const [o,u,d]=await Promise.all([j('/api'),j('/api/overview'),j('/api/deployments')]);
  $('kpis').innerHTML=[['Open sessions',u.sessions.filter(s=>s.open).length],
   ['Requests (24h)',fmt(u.requests_24h)],['Est. cost (24h)',usd(u.cost_24h)],
   ['Est. cost (total)',usd(u.cost_total)]].map(([k,v])=>'<div class="card kpi"><b>'+v+'</b><span>'+k+'</span></div>').join('');
  $('models').innerHTML=o.models.map(a=>'<div><button style="width:100%;text-align:left;margin:.2rem 0" class="'+(a==o.active?'on':'')+'" onclick="use(\\''+a+'\\')">'+(a==o.active?'\\u25cf ':'\\u25cb ')+a+'</button></div>').join('');
- $('sessions').innerHTML='<table><tr><th></th><th>Id</th><th>Folder</th><th>Model</th><th>Req</th><th>Tokens</th><th>Cost</th></tr>'+
-  u.sessions.map(s=>'<tr><td><span class="dot '+(s.open?'live':'')+'"></span></td><td>'+s.id+'</td><td class=mut title="'+s.cwd+'">'+(s.cwd||'').split(/[\\\\/]/).pop()+'</td><td>'+(s.open?'<select onchange="useFor(\\''+s.id+'\\',this.value)"><option value="">(global: '+o.active+')</option>'+o.models.map(m=>'<option'+(m==s.model?' selected':'')+'>'+m+'</option>').join('')+'</select>':'')+'</td><td class=n>'+s.requests+'</td><td class=n>'+fmt(s.prompt_tokens+s.completion_tokens)+'</td><td class=n>'+usd(s.cost)+'</td></tr>').join('')+'</table>';
+ const ss=u.sessions.filter(s=>showClosed||s.open),nc=u.sessions.length-u.sessions.filter(s=>s.open).length;
+ $('sessions').innerHTML=(ss.length?'<table><tr><th></th><th>Id</th><th>Folder</th><th>Model</th><th>Req</th><th>Cost</th></tr>'+
+  ss.map(s=>'<tr class="'+(s.open?'':'closed')+'"><td><span class="dot '+(s.open?'live':'')+'"></span></td><td class="id nw">'+s.id+'</td><td class="mut nw" title="'+s.cwd+'">'+(s.cwd||'').split(/[\\\\/]/).pop()+'</td><td>'+(s.open?'<select onchange="useFor(\\''+s.id+'\\',this.value)"><option value="">Global ('+o.active+')</option>'+o.models.map(m=>'<option'+(m==s.model?' selected':'')+'>'+m+'</option>').join('')+'</select>':'<span class=mut>'+(s.model||'')+'</span>')+'</td><td class=n>'+s.requests+'</td><td class=n>'+usd(s.cost)+'</td></tr>').join('')+'</table>':'<div class=mut>No open sessions. Start one with <code>byom copilot</code>.</div>')+
+  (nc?'<div class=mut style="margin-top:.5rem"><label><input type=checkbox '+(showClosed?'checked ':'')+'onchange="showClosed=this.checked;load()"> show '+nc+' closed sessions</label></div>':'');
  $('usage').innerHTML='<table><tr><th>Model</th><th>Req</th><th>In</th><th>Out</th><th>Cost</th></tr>'+
   u.models.map(m=>'<tr><td>'+m.alias+'</td><td class=n>'+m.requests+'</td><td class=n>'+fmt(m.prompt_tokens)+'</td><td class=n>'+fmt(m.completion_tokens)+'</td><td class=n>'+usd(m.cost)+'</td></tr>').join('')+'</table>';
  $('deployed').innerHTML='<table><tr><th>Alias</th><th>Model</th><th>SKU</th><th>Status</th></tr>'+
