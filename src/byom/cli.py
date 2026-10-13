@@ -138,6 +138,7 @@ def use(alias: str):
         raise typer.Exit(1) from None
     typer.echo(f"Active model: {alias}")
 
+
 @app.command()
 def status():
     """List selectable models and mark the active one."""
@@ -290,7 +291,7 @@ def copilot(
         lean_home.mkdir(exist_ok=True)
         env["COPILOT_HOME"] = str(lean_home)
     started = None if _gateway_up() else _start_gateway()
-    mcp_cfg = home() / "mcp.json"
+    mcp_cfg = home() / f"mcp-{sid}.json"
     mcp_cfg.write_text(
         json.dumps(
             {
@@ -299,6 +300,7 @@ def copilot(
                         "type": "local",
                         "command": sys.executable,
                         "args": ["-m", "byom", "mcp"],
+                        "env": {"BYOM_SESSION": sid},
                         "tools": ["*"],
                     }
                 }
@@ -310,6 +312,8 @@ def copilot(
         code = subprocess.call([exe, "--additional-mcp-config", f"@{mcp_cfg}", *extra], env=env)
     finally:
         usage.end_session(sid)
+        state.set_session_model(sid, None)
+        mcp_cfg.unlink(missing_ok=True)
         if started:
             started.terminate()
     raise typer.Exit(code)

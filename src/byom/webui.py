@@ -99,6 +99,7 @@ const $=id=>document.getElementById(id), fmt=n=>(n||0).toLocaleString();
 const usd=n=>'$'+(n||0).toFixed(3);
 let profile=null,catalogLoaded=false;
 async function j(u,o){return (await fetch(u,o)).json()}
+async function useFor(sid,a){await fetch('/api/use',{method:'POST',body:sid+'|'+a});load()}
 async function use(a){await fetch('/api/use',{method:'POST',body:a});load()}
 async function deploy(p,item){
  const name=prompt('Deployment name',item.name.replace(/[^a-z0-9-]/gi,'-'));if(!name)return;
@@ -121,8 +122,8 @@ async function load(){
   ['Requests (24h)',fmt(u.requests_24h)],['Est. cost (24h)',usd(u.cost_24h)],
   ['Est. cost (total)',usd(u.cost_total)]].map(([k,v])=>'<div class="card kpi"><b>'+v+'</b><span>'+k+'</span></div>').join('');
  $('models').innerHTML=o.models.map(a=>'<div><button style="width:100%;text-align:left;margin:.2rem 0" class="'+(a==o.active?'on':'')+'" onclick="use(\\''+a+'\\')">'+(a==o.active?'\\u25cf ':'\\u25cb ')+a+'</button></div>').join('');
- $('sessions').innerHTML='<table><tr><th></th><th>Id</th><th>Folder</th><th>Req</th><th>Tokens</th><th>Cost</th></tr>'+
-  u.sessions.map(s=>'<tr><td><span class="dot '+(s.open?'live':'')+'"></span></td><td>'+s.id+'</td><td class=mut title="'+s.cwd+'">'+(s.cwd||'').split(/[\\\\/]/).pop()+'</td><td class=n>'+s.requests+'</td><td class=n>'+fmt(s.prompt_tokens+s.completion_tokens)+'</td><td class=n>'+usd(s.cost)+'</td></tr>').join('')+'</table>';
+ $('sessions').innerHTML='<table><tr><th></th><th>Id</th><th>Folder</th><th>Model</th><th>Req</th><th>Tokens</th><th>Cost</th></tr>'+
+  u.sessions.map(s=>'<tr><td><span class="dot '+(s.open?'live':'')+'"></span></td><td>'+s.id+'</td><td class=mut title="'+s.cwd+'">'+(s.cwd||'').split(/[\\\\/]/).pop()+'</td><td>'+(s.open?'<select onchange="useFor(\\''+s.id+'\\',this.value)"><option value="">(global: '+o.active+')</option>'+o.models.map(m=>'<option'+(m==s.model?' selected':'')+'>'+m+'</option>').join('')+'</select>':'')+'</td><td class=n>'+s.requests+'</td><td class=n>'+fmt(s.prompt_tokens+s.completion_tokens)+'</td><td class=n>'+usd(s.cost)+'</td></tr>').join('')+'</table>';
  $('usage').innerHTML='<table><tr><th>Model</th><th>Req</th><th>In</th><th>Out</th><th>Cost</th></tr>'+
   u.models.map(m=>'<tr><td>'+m.alias+'</td><td class=n>'+m.requests+'</td><td class=n>'+fmt(m.prompt_tokens)+'</td><td class=n>'+fmt(m.completion_tokens)+'</td><td class=n>'+usd(m.cost)+'</td></tr>').join('')+'</table>';
  $('deployed').innerHTML='<table><tr><th>Alias</th><th>Model</th><th>SKU</th><th>Status</th></tr>'+
@@ -185,6 +186,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = {"active": state.get_active(), "models": state.list_aliases()}
             elif url.path == "/api/overview":
                 body = usage.overview()
+                for s in body["sessions"]:
+                    s["model"] = state.get_session_model(s["id"])
             elif url.path == "/api/deployments":
                 body = {
                     "deployments": _cached("dep", 15, _deployments),

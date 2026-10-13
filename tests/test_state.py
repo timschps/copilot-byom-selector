@@ -33,3 +33,12 @@ def test_ensure_active_falls_back(byom_home):
         yaml.safe_dump({"model_list": [{"model_name": "priv-a"}]}), encoding="utf-8"
     )
     assert state.ensure_active() == "priv-a"
+
+
+def test_session_model_overrides_global(byom_home):
+    state.set_active("priv-a")
+    state.set_session_model("s1", "priv-b")
+    assert state.resolve("byom-active", "s1") == "priv-b"
+    assert state.resolve("byom-active", "s2") == "priv-a"
+    state.set_session_model("s1", None)
+    assert state.resolve("byom-active", "s1") == "priv-a"

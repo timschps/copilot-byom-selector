@@ -24,7 +24,11 @@ def _alias(kwargs: dict) -> str:
 
 class ActiveModelHook(CustomLogger):
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
-        data["model"] = resolve(data.get("model"))
+        headers = {
+            k.lower(): v
+            for k, v in ((data.get("proxy_server_request") or {}).get("headers") or {}).items()
+        }
+        data["model"] = resolve(data.get("model"), headers.get(SESSION_HEADER))
         tools = data.get("tools")
         cfg = toolfilter.load_config()
         if tools and not any(s in str(data["model"]) for s in cfg["skip_models"]):

@@ -80,6 +80,7 @@ def filter_tools(
     else:
         used = _used_names(messages)
         query = _words(_last_user_text(messages))
+
         # Core tools first, then tools already used in this conversation, then by relevance.
         def rank(t):
             n = _name(t)
