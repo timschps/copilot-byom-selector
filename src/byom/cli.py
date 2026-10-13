@@ -12,7 +12,7 @@ import time
 import typer
 
 from . import auth, foundry, gateway, state, usage
-from .config import Profile, get_profile, home, load_profiles, save_profiles
+from .config import Profile, get_profile, home, load_profiles, save_profiles, valid_prefix
 
 app = typer.Typer(
     help="Manage Foundry models and route GitHub Copilot CLI through a local gateway."
@@ -39,7 +39,33 @@ def profile_add(
 @profile_app.command("list")
 def profile_list():
     for p in load_profiles().values():
-        typer.echo(f"{p.name}\ttenant={p.tenant_id}\t{p.account} ({p.resource_group})")
+        typer.echo(
+            f"{p.name}\tprefix={p.label}\ttenant={p.tenant_id}\t{p.account} ({p.resource_group})"
+        )
+
+
+@profile_app.command("set")
+def profile_set(
+    name: str,
+    prefix: str = typer.Option(None, help="Prefix shown in model aliases, e.g. 'personal'"),
+    wire_api: str = typer.Option(None, help="completions or responses"),
+):
+    """Change a profile's alias prefix or wire API, then refresh the gateway config."""
+    profiles = load_profiles()
+    if name not in profiles:
+        typer.echo(f"Unknown profile '{name}'.")
+        raise typer.Exit(1)
+    old_label = profiles[name].label
+    if prefix is not None:
+        if not valid_prefix(prefix):
+            typer.echo("Prefix: lowercase letters, digits and '-', max 25 characters.")
+            raise typer.Exit(1)
+        profiles[name].prefix = prefix
+        state.rename_prefix(old_label, prefix)
+    if wire_api:
+        profiles[name].wire_api = wire_api
+    save_profiles(profiles)
+    sync()
 
 
 @app.command()
@@ -253,8 +279,8 @@ def copilot(
         raise typer.Exit(1)
     wire = "completions"
     target = state.resolve(model_alias) or model_alias
-    for name, p in load_profiles().items():
-        if target.startswith(name + "-"):
+    for p in load_profiles().values():
+        if target.startswith(p.label + "-"):
             wire = p.wire_api
     env = {**os.environ, **gateway.copilot_env(model_alias, wire, max_prompt_tokens)}
     sid = usage.start_session(os.getcwd())

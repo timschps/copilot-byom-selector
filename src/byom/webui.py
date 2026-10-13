@@ -33,7 +33,7 @@ def _deployments() -> list[dict]:
             rows.append(
                 {
                     "profile": name,
-                    "alias": f"{name}-{d.name}",
+                    "alias": f"{p.label}-{d.name}",
                     "deployment": d.name,
                     "model": f"{m.name} {m.version or ''}".strip(),
                     "format": m.format,
@@ -86,6 +86,7 @@ background:var(--card);color:var(--ink)}button.on{background:var(--acc);color:#f
 <div class=card><h2>Active model</h2><div id=models></div></div>
 <div class=card><h2>Sessions</h2><div id=sessions></div></div>
 <div class=card><h2>Usage per model</h2><div id=usage></div></div>
+<div class=card><h2>Profiles (tenant prefix)</h2><div id=profiles></div></div>
 <div class=card><h2>Deployed</h2><div id=deployed></div></div>
 <div class=card style="grid-column:1/-1"><h2>Available to deploy</h2>
 <div id=catalog class=mut>Loading catalog...</div></div>
@@ -103,7 +104,18 @@ async function deploy(p,item){
  const name=prompt('Deployment name',item.name.replace(/[^a-z0-9-]/gi,'-'));if(!name)return;
  if(!confirm('Deploy '+item.name+' ('+item.version+')?\\nThis can incur Azure costs per use.'))return;
  await fetch('/api/deploy',{method:'POST',body:JSON.stringify({profile:p,name,item})});load()}
+async function savePrefix(name){
+ const prefix=$('pf-'+name).value.trim();
+ const r=await fetch('/api/profile',{method:'POST',body:JSON.stringify({name,prefix})});
+ if(!r.ok)alert(await r.text());else{profilesLoaded=false;load()}}
+async function loadProfiles(){
+ const ps=await j('/api/profiles');
+ $('profiles').innerHTML=ps.map(p=>'<div style="margin:.4rem 0"><b>'+p.name+'</b> <span class=mut>'+p.account+' / '+p.tenant.slice(0,8)+'</span><br>'+
+  'Prefix <input id="pf-'+p.name+'" value="'+p.prefix+'" size=14> <button onclick="savePrefix(\\''+p.name+'\\')">Save</button></div>').join('')+
+  '<div class=mut>Models appear as <i>prefix-model</i>. Saving rewrites the aliases.</div>'}
+let profilesLoaded=false;
 async function load(){
+ if(!profilesLoaded){profilesLoaded=true;loadProfiles()}
  const [o,u,d]=await Promise.all([j('/api'),j('/api/overview'),j('/api/deployments')]);
  $('kpis').innerHTML=[['Open sessions',u.sessions.filter(s=>s.open).length],
   ['Requests (24h)',fmt(u.requests_24h)],['Est. cost (24h)',usd(u.cost_24h)],
@@ -165,6 +177,11 @@ class Handler(BaseHTTPRequestHandler):
                     "deployments": _cached("dep", 15, _deployments),
                     "deploying": _deploying,
                 }
+            elif url.path == "/api/profiles":
+                body = [
+                    {"name": n, "prefix": p.label, "tenant": p.tenant_id, "account": p.account}
+                    for n, p in load_profiles().items()
+                ]
             elif url.path == "/api/catalog":
                 profile = parse_qs(url.query).get("profile", [""])[0]
                 body = _cached("cat:" + profile, 600, lambda: _catalog(profile))
@@ -186,12 +203,24 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self._send(str(e), "text/plain", 400)
             return self._send(json.dumps({"active": raw}))
+        if self.path == "/api/profile":
+            from .cli import profile_set
+
+            req = json.loads(raw)
+            try:
+                profile_set(req["name"], req["prefix"], None)
+            except (SystemExit, Exception) as e:
+                return self._send(f"invalid prefix or profile ({e})", "text/plain", 400)
+            _cache.clear()
+            return self._send(json.dumps({"ok": True}))
         if self.path == "/api/deploy":
             req = json.loads(raw)
             profile, item = req["profile"], req["item"]
-            name = req["name"].removeprefix(profile + "-")  # alias = <profile>-<deployment>
-            if profile not in load_profiles() or item.get("format") != "OpenAI":
+            profiles = load_profiles()
+            if profile not in profiles or item.get("format") != "OpenAI":
                 return self._send("unsupported", "text/plain", 400)
+            # Alias = <prefix>-<deployment>; the user only names the deployment itself.
+            name = req["name"].removeprefix(profiles[profile].label + "-")
             _deploying[name] = "running"
             threading.Thread(target=_deploy, args=(profile, name, item), daemon=True).start()
             return self._send(json.dumps({"started": name}), code=202)

@@ -50,6 +50,15 @@ def ensure_active() -> str | None:
     return None
 
 
+def rename_prefix(old: str, new: str) -> None:
+    """Keep the selection when a profile's alias prefix changes."""
+    current = get_active()
+    if current and current.startswith(old + "-"):
+        _state_path().write_text(
+            json.dumps({"alias": new + current[len(old):]}), encoding="utf-8"
+        )
+
+
 def resolve(model: str | None) -> str | None:
     """Map the virtual alias, and model names Copilot picks by itself, to the active backend."""
     if model and model != ACTIVE_ALIAS and model in list_aliases():

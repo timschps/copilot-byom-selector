@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -23,6 +24,18 @@ class Profile:
     resource_group: str
     account: str  # Foundry / Azure AI Services account name
     wire_api: str = "completions"  # or "responses" for GPT-5 family
+    prefix: str = ""  # shown in model aliases; defaults to the profile name
+
+    @property
+    def label(self) -> str:
+        return self.prefix or self.name
+
+
+PREFIX_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,24}$")
+
+
+def valid_prefix(prefix: str) -> bool:
+    return bool(PREFIX_RE.match(prefix))
 
 
 def profiles_path() -> Path:

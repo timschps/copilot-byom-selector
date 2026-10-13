@@ -49,7 +49,7 @@ def build_entries(profile: Profile, deployments, base: str) -> list[dict]:
                 + "/models",
                 "api_key": f"os.environ/{env_name(profile.name)}",
             }
-        entries.append({"model_name": alias(profile.name, d.name), "litellm_params": params})
+        entries.append({"model_name": alias(profile.label, d.name), "litellm_params": params})
     return entries
 
 
