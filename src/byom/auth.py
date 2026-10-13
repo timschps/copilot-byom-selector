@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from azure.identity import (
     AuthenticationRecord,
-    InteractiveBrowserCredential,
+    DeviceCodeCredential,
     TokenCachePersistenceOptions,
 )
 
@@ -17,12 +17,12 @@ def _record_path(profile: Profile):
     return home() / f"auth-{profile.name}.json"
 
 
-def credential(profile: Profile) -> InteractiveBrowserCredential:
+def credential(profile: Profile) -> DeviceCodeCredential:
     record = None
     path = _record_path(profile)
     if path.exists():
         record = AuthenticationRecord.deserialize(path.read_text(encoding="utf-8"))
-    return InteractiveBrowserCredential(
+    return DeviceCodeCredential(
         tenant_id=profile.tenant_id,
         authentication_record=record,
         cache_persistence_options=TokenCachePersistenceOptions(name=f"byom-{profile.name}"),

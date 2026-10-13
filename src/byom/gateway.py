@@ -59,11 +59,19 @@ def write_config(entries: list[dict]):
     return path
 
 
-def copilot_env(model_alias: str, wire_api: str = "completions") -> dict[str, str]:
+def copilot_env(
+    model_alias: str,
+    wire_api: str = "completions",
+    max_prompt_tokens: int = 128000,
+    max_output_tokens: int = 16000,
+) -> dict[str, str]:
+    # Aliases are not in Copilot's model catalog, so limits must be given explicitly.
     return {
         "COPILOT_PROVIDER_TYPE": "openai",
         "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{PORT}/v1",
         "COPILOT_PROVIDER_API_KEY": GATEWAY_KEY,
         "COPILOT_PROVIDER_WIRE_API": wire_api,
+        "COPILOT_PROVIDER_MAX_PROMPT_TOKENS": str(max_prompt_tokens),
+        "COPILOT_PROVIDER_MAX_OUTPUT_TOKENS": str(max_output_tokens),
         "COPILOT_MODEL": model_alias,
     }

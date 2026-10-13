@@ -95,6 +95,7 @@ def serve():
         typer.echo("Run 'byom sync' first.")
         raise typer.Exit(1)
     env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"  # LiteLLM prints non-ASCII characters, which crash cp1252 consoles
     for p in load_profiles().values():
         env[gateway.env_name(p.name)] = foundry.get_key(p)
     subprocess.run(

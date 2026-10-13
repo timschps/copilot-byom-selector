@@ -34,11 +34,20 @@ byom copilot priv-gpt41   # terminal 2
 
 For GPT-5 family models add `--wire-api responses` to the profile.
 
+## Troubleshooting
+
+- **`No response was returned` and nothing in the gateway log**: Copilot never called the gateway. Aliases are not in
+  Copilot's model catalog, so `byom copilot` passes explicit token limits. If your Copilot setup loads many MCP servers,
+  skills or plugins, the static context can exceed a 128k model's budget. Use a larger-context deployment (for example
+  `gpt-4.1`) or test with a clean profile: `$env:COPILOT_HOME = "$env:TEMP\copilot-clean"`.
+- **`UnicodeEncodeError` when the gateway starts on Windows**: `byom serve` already forces `PYTHONUTF8=1`.
+- **Sign-in**: `byom login` uses device code flow (no browser window needed); tokens are cached per profile.
+
 ## Requirements and status
 
 - Your identity needs *Cognitive Services Contributor* (manage deployments and read keys) on the account.
 - Models must support streaming and tool calling (128k+ context recommended).
-- Status: early. Azure OpenAI models (`azure/`) are the first target; non-OpenAI Foundry models (`azure_ai/`) and the Responses API through the gateway still need verification.
+- Status: early. Verified end to end: device-code login, listing, `sync`, `serve` and a Copilot CLI prompt answered by an Azure OpenAI deployment (`gpt-4o-mini`, chat completions) in a personal tenant. Still to verify: GPT-5 via the Responses API, non-OpenAI Foundry models (`azure_ai/`).
 
 ## Documentation
 
