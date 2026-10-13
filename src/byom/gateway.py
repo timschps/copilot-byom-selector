@@ -32,6 +32,16 @@ def build_entries(profile: Profile, deployments, base: str) -> list[dict]:
                 "api_key": f"os.environ/{env_name(profile.name)}",
                 "api_version": "2025-04-01-preview",
             }
+        elif fmt == "anthropic":
+            # Claude on Foundry is served through the Anthropic Messages API.
+            params = {
+                "model": f"anthropic/{d.name}",
+                "api_base": base.replace(".cognitiveservices.azure.com", ".services.ai.azure.com")
+                + "/anthropic",
+                "api_key": f"os.environ/{env_name(profile.name)}",
+                # Copilot sends temperature and top_p; recent Claude models accept only one.
+                "additional_drop_params": ["top_p"],
+            }
         else:
             params = {
                 "model": f"azure_ai/{d.name}",

@@ -46,7 +46,7 @@ Design rules:
 
 1. `byom copilot <profile>-<deployment>` sets `COPILOT_PROVIDER_*` variables and starts `copilot`.
 2. Copilot sends OpenAI-style requests to the gateway with `model=<alias>`.
-3. LiteLLM looks up the alias and calls `azure/<deployment>` (OpenAI models) or `azure_ai/<deployment>` (other Foundry models).
+3. LiteLLM looks up the alias and calls `azure/<deployment>` (OpenAI models), `anthropic/<deployment>` (Claude, via the Foundry Anthropic endpoint) or `azure_ai/<deployment>` (other Foundry models).
 
 ## Why these choices
 
@@ -60,5 +60,6 @@ Design rules:
 
 - Entra-token inference auth is not implemented yet.
 - GPT-5 models need the Responses API (`wire_api: responses` in the profile); verify end to end against your deployment.
-- Non-OpenAI Foundry models (`azure_ai/`) are untested.
+- Non-OpenAI, non-Anthropic Foundry models (`azure_ai/`) are untested.
+- Anthropic deployments require provider data: `byom deploy ... --format Anthropic --org-name <n> --industry <i> --country <cc>`.
 - On Windows ARM64 some LiteLLM dependencies (`tiktoken`, `fastuuid`) have no prebuilt wheels and need Rust plus the MSVC build tools; run the gateway elsewhere (WSL, container) or install those tools. `byom` management commands work without the `gateway` extra.

@@ -47,7 +47,7 @@ For GPT-5 family models add `--wire-api responses` to the profile.
 
 - Your identity needs *Cognitive Services Contributor* (manage deployments and read keys) on the account.
 - Models must support streaming and tool calling (128k+ context recommended).
-- Status: early. Verified end to end in a personal tenant: device-code login, listing, deploying, `sync`, `serve`, and Copilot CLI prompts answered by Azure OpenAI deployments `gpt-4o-mini`, `gpt-4.1` and `gpt-5` (chat completions). Anthropic models need a subscription with a valid payment method (Marketplace billing); a Visual Studio credit subscription is rejected. Still to verify: non-OpenAI Foundry models end to end, and the Responses API.
+- Status: early. Verified end to end in a personal tenant: device-code login, listing, deploying, `sync`, `serve`, and Copilot CLI prompts with tool calling answered by `gpt-4o-mini`, `gpt-4.1`, `gpt-5` (chat completions) and Claude Haiku 4.5 (Anthropic Messages API on Foundry). Anthropic models are billed through the Azure Marketplace, so the subscription needs a valid payment method. Still to verify: the Responses API and other non-OpenAI Foundry models (`azure_ai/`).
 
 ## Documentation
 
