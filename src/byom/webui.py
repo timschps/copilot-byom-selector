@@ -126,17 +126,30 @@ async function load(){
  $('usage').innerHTML='<table><tr><th>Model</th><th>Req</th><th>In</th><th>Out</th><th>Cost</th></tr>'+
   u.models.map(m=>'<tr><td>'+m.alias+'</td><td class=n>'+m.requests+'</td><td class=n>'+fmt(m.prompt_tokens)+'</td><td class=n>'+fmt(m.completion_tokens)+'</td><td class=n>'+usd(m.cost)+'</td></tr>').join('')+'</table>';
  $('deployed').innerHTML='<table><tr><th>Alias</th><th>Model</th><th>SKU</th><th>Status</th></tr>'+
-  d.deployments.map(x=>'<tr><td>'+x.alias+'</td><td>'+x.model+'</td><td>'+(x.sku||'')+'</td><td>'+x.status+'</td></tr>').join('')+'</table>'+
-  Object.entries(d.deploying).map(([k,v])=>'<div class=mut>'+k+': '+v+'</div>').join('');
- if(!catalogLoaded){catalogLoaded=true;profile=d.deployments[0]?.profile;
-  if(profile){const c=await j('/api/catalog?profile='+profile);
-   const have=new Set(d.deployments.map(x=>x.model.split(' ')[0]));
-   CAT=c.filter(i=>!have.has(i.name));
-   $('catalog').innerHTML='<table><tr><th>Model</th><th>Provider</th><th>Version</th><th>SKUs</th><th></th></tr>'+
-   CAT.map((i,n)=>'<tr><td>'+i.name+'</td><td>'+i.format+'</td><td>'+i.version+'</td><td class=mut>'+i.skus.join(', ')+'</td><td>'+
-   (i.format=='OpenAI'?'<button onclick="deploy(profile,CAT['+n+'])">Deploy</button> ':'')+
-   '<button onclick="showCli('+n+')">CLI command</button></td></tr>').join('')+'</table>'}}
+  (d.deployments||[]).map(x=>'<tr><td>'+x.alias+'</td><td>'+x.model+'</td><td>'+(x.sku||'')+'</td><td>'+x.status+'</td></tr>').join('')+'</table>'+
+  Object.entries(d.deploying||{}).map(([k,v])=>'<div class=mut>'+k+': '+v+'</div>').join('');
+ const nowDeployed=new Set((d.deployments||[]).map(x=>x.model.split(' ')[0]));
+ const changed=[...nowDeployed].join()!=[...catalogDeployed].join();
+ catalogDeployed=nowDeployed;
+ if(changed&&catalogLoaded)renderCatalog();
+ if(!catalogLoaded&&d.deployments&&d.deployments.length){profile=d.deployments[0].profile;loadCatalog()}
+ else if(d.error)$('deployed').innerHTML+='<div class=mut>Error: '+d.error+'</div>';
 }
+let CAT_ALL=[],catalogDeployed=new Set(),showAll=false;
+async function loadCatalog(){
+ try{const c=await j('/api/catalog?profile='+profile);
+  if(c.error)throw new Error(c.error);
+  CAT_ALL=c;catalogLoaded=true;renderCatalog()}
+ catch(e){$('catalog').innerHTML='Catalog failed to load: '+e.message+' <button onclick="loadCatalog()">Retry</button>'}}
+function renderCatalog(){
+ CAT=CAT_ALL.filter(i=>!catalogDeployed.has(i.name)&&(showAll||i.compatible));
+ const hidden=CAT_ALL.filter(i=>!catalogDeployed.has(i.name)&&!i.compatible).length;
+ $('catalog').innerHTML='<div style="margin-bottom:.5rem">Showing models verified to work through the gateway (OpenAI chat models and Anthropic). '+
+  '<label><input type=checkbox '+(showAll?'checked':'')+' onchange="showAll=this.checked;renderCatalog()"> also show '+hidden+' other-provider models (untested)</label></div>'+
+  '<table><tr><th>Model</th><th>Provider</th><th>Version</th><th>SKUs</th><th></th></tr>'+
+  CAT.map((i,n)=>'<tr><td>'+i.name+'</td><td>'+i.format+(i.compatible?'':' <span class=mut>(untested)</span>')+'</td><td>'+i.version+'</td><td class=mut>'+i.skus.join(', ')+'</td><td>'+
+  (i.format=='OpenAI'&&i.compatible?'<button onclick="deploy(profile,CAT['+n+'])">Deploy</button> ':'')+
+  '<button onclick="showCli('+n+')">CLI command</button></td></tr>').join('')+'</table>'}
 function cliCmd(i){
  const slug=i.name.toLowerCase().replace(/[^a-z0-9-]/g,'-');
  let c='byom deploy '+profile+' '+slug+' --model '+i.name+' --version '+i.version+' --format '+i.format;

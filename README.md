@@ -43,6 +43,14 @@ For GPT-5 family models add `--wire-api responses` to the profile.
 
 Usage lives in `~/.byom/usage.db`. Costs are estimates from a local price table (`usage.PRICES`), not your Azure invoice.
 
+### Tenant prefix
+
+Every model alias is `<prefix>-<deployment>`, so it is clear which tenant a model bills to. The prefix defaults to the profile name; change it with `byom profile set <profile> --prefix personal` or in the control center. You only name the deployment itself when deploying; the prefix is added automatically.
+
+### Catalog compatibility
+
+The control center lists models that this account can deploy, limited to chat-capable models. By default only routes verified through the gateway are shown: OpenAI chat models and Anthropic. Codex, realtime, audio, image and embedding models are excluded; other providers are behind an "untested" toggle.
+
 ## Troubleshooting
 
 - **Many MCP servers/plugins (hundreds of tools):** Azure OpenAI accepts at most 128 tools per request. The gateway filters automatically (built-in tools first, then tools used earlier in the conversation, then relevance to your last message; tune via `~/.byom/tools.yaml` with `max_tools`, `always_keep`, `deny`). Copilot also checks tool definitions against its context budget before sending, so start with a higher budget: `byom copilot --max-prompt-tokens 400000` (keep it below the smallest model you will switch to). `--lean` remains the fully minimal alternative.

@@ -75,14 +75,25 @@ def delete(profile: Profile, name: str) -> None:
     client(profile).deployments.begin_delete(profile.resource_group, profile.account, name).result()
 
 
+# Name fragments of OpenAI models that cannot serve Copilot through chat completions.
+_INCOMPATIBLE = ("codex", "realtime", "audio", "transcribe", "tts", "image", "embedding", "sora")
+
+
+def is_compatible(fmt: str, name: str) -> bool:
+    """Verified routes: OpenAI chat models (azure/) and Anthropic (anthropic/)."""
+    if fmt == "Anthropic":
+        return True
+    return fmt == "OpenAI" and not any(f in name.lower() for f in _INCOMPATIBLE)
+
+
 def list_catalog(profile: Profile) -> list[dict]:
-    """Models this account can deploy (latest version per model, with SKUs and lifecycle)."""
+    """Chat-capable models this account can deploy (latest version each), with a
+    `compatible` flag for models whose gateway route is verified."""
     latest: dict[tuple[str, str], dict] = {}
     for m in client(profile).accounts.list_models(profile.resource_group, profile.account):
         if m.lifecycle_status not in (None, "GenerallyAvailable", "Preview"):
             continue
-        caps = m.capabilities or {}
-        if "chatCompletion" not in caps and "responses" not in caps:
+        if "chatCompletion" not in (m.capabilities or {}):
             continue
         item = {
             "format": m.format,
@@ -90,6 +101,7 @@ def list_catalog(profile: Profile) -> list[dict]:
             "version": m.version,
             "skus": [s.name for s in (m.skus or [])],
             "lifecycle": m.lifecycle_status,
+            "compatible": is_compatible(m.format, m.name),
         }
         key = (m.format, m.name)
         if key not in latest or (item["version"] or "") > (latest[key]["version"] or ""):
