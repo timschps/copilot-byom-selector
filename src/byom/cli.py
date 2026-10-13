@@ -11,7 +11,7 @@ import time
 
 import typer
 
-from . import auth, foundry, gateway, state
+from . import auth, foundry, gateway, state, usage
 from .config import Profile, get_profile, home, load_profiles, save_profiles
 
 app = typer.Typer(
@@ -251,6 +251,8 @@ def copilot(
         if target.startswith(name + "-"):
             wire = p.wire_api
     env = {**os.environ, **gateway.copilot_env(model_alias, wire)}
+    sid = usage.start_session(os.getcwd())
+    env["COPILOT_PROVIDER_HEADERS"] = f"X-Byom-Session: {sid}"
     if lean:
         lean_home = home() / "copilot-lean"
         lean_home.mkdir(exist_ok=True)
@@ -275,6 +277,7 @@ def copilot(
     try:
         code = subprocess.call([exe, "--additional-mcp-config", f"@{mcp_cfg}", *extra], env=env)
     finally:
+        usage.end_session(sid)
         if started:
             started.terminate()
     raise typer.Exit(code)

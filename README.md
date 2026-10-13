@@ -28,11 +28,20 @@ byom login priv
 byom deploy priv gpt41 --model gpt-4.1 --version 2025-04-14
 byom list priv
 byom sync
-byom serve            # terminal 1
-byom copilot priv-gpt41   # terminal 2
+byom copilot --lean    # starts the gateway in the background if needed
 ```
 
 For GPT-5 family models add `--wire-api responses` to the profile.
+
+## Switching models and the control center
+
+`byom copilot` starts Copilot on a virtual model, `byom-active`, which the gateway maps to the model you selected. Switch at any time:
+
+- `byom pick` (arrow keys), `byom use <alias>`, `byom status`.
+- Inside the session: ask Copilot to switch model. `byom copilot` injects a per-session MCP server (`byom mcp`); a plain `copilot` is unaffected.
+- `byom ui` serves a local control center at http://127.0.0.1:4001: switch model, open sessions, usage and estimated cost per session and model, deployed models, and a catalog of models to deploy (OpenAI models; other providers via `byom deploy`).
+
+Usage lives in `~/.byom/usage.db`. Costs are estimates from a local price table (`usage.PRICES`), not your Azure invoice.
 
 ## Troubleshooting
 

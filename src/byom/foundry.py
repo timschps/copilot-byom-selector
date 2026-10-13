@@ -75,6 +75,28 @@ def delete(profile: Profile, name: str) -> None:
     client(profile).deployments.begin_delete(profile.resource_group, profile.account, name).result()
 
 
+def list_catalog(profile: Profile) -> list[dict]:
+    """Models this account can deploy (latest version per model, with SKUs and lifecycle)."""
+    latest: dict[tuple[str, str], dict] = {}
+    for m in client(profile).accounts.list_models(profile.resource_group, profile.account):
+        if m.lifecycle_status not in (None, "GenerallyAvailable", "Preview"):
+            continue
+        caps = m.capabilities or {}
+        if "chatCompletion" not in caps and "responses" not in caps:
+            continue
+        item = {
+            "format": m.format,
+            "name": m.name,
+            "version": m.version,
+            "skus": [s.name for s in (m.skus or [])],
+            "lifecycle": m.lifecycle_status,
+        }
+        key = (m.format, m.name)
+        if key not in latest or (item["version"] or "") > (latest[key]["version"] or ""):
+            latest[key] = item
+    return sorted(latest.values(), key=lambda i: (i["format"], i["name"]))
+
+
 def get_key(profile: Profile) -> str:
     keys = client(profile).accounts.list_keys(profile.resource_group, profile.account)
     return keys.key1
