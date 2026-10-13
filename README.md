@@ -43,6 +43,10 @@ For GPT-5 family models add `--wire-api responses` to the profile.
 
 Usage lives in `~/.byom/usage.db`. Costs are estimates from a local price table (`usage.PRICES`), not your Azure invoice.
 
+### Billed cost (Azure)
+
+The control center also shows the real billed cost of the last 30 days per profile, read from the Azure Cost Management API (scoped to the Foundry account) and compared with the local estimate. It needs the **Cost Management Reader** role on the subscription. Azure reports cost with a delay of hours to a day, and Azure does not return a cost per request, so per-session cost stays an estimate. Marketplace-billed models (Anthropic) may be billed outside the account scope and not appear here.
+
 ### Tenant prefix
 
 Every model alias is `<prefix>-<deployment>`, so it is clear which tenant a model bills to. The prefix defaults to the profile name; change it with `byom profile set <profile> --prefix personal` or in the control center. You only name the deployment itself when deploying; the prefix is added automatically.

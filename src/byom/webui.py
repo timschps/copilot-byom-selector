@@ -8,7 +8,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import foundry, state, usage
+from . import billing, foundry, state, usage
 from .config import load_profiles
 
 PORT = 4001
@@ -91,6 +91,7 @@ background:var(--card);color:var(--ink)}button:hover{border-color:var(--acc)}
 <div class=card><h2>Sessions</h2><div id=sessions></div></div>
 <div class=card><h2>Usage per model</h2><div id=usage></div></div>
 <div class=card><h2>Profiles (tenant prefix)</h2><div id=profiles></div></div>
+<div class=card><h2>Billed by Azure (30 days)</h2><div id=billing class=mut>Loading...</div></div>
 <div class=card><h2>Deployed</h2><div id=deployed></div></div>
 <div class=card style="grid-column:1/-1"><h2>Available to deploy</h2>
 <div id=catalog class=mut>Loading catalog...</div></div>
@@ -118,10 +119,23 @@ async function loadProfiles(){
  $('profiles').innerHTML=ps.map(p=>'<div style="margin:.4rem 0"><b>'+p.name+'</b> <span class=mut>'+p.account+' / '+p.tenant.slice(0,8)+'</span><br>'+
   'Prefix <input id="pf-'+p.name+'" value="'+p.prefix+'" size=14> <button onclick="savePrefix(\\''+p.name+'\\')">Save</button></div>').join('')+
   '<div class=mut>Models appear as <i>prefix-model</i>. Saving rewrites the aliases.</div>'}
-let profilesLoaded=false;
+let profilesLoaded=false,billingLoaded=false;
+async function loadBilling(){
+ const ps=await j('/api/profiles');let h='';
+ for(const p of ps){
+  const b=await j('/api/billing?profile='+p.name);
+  if(b.error){h+='<div><b>'+p.name+'</b>: '+b.error+'</div>';continue}
+  if(!b.by_day.length){h+='<div><b>'+p.name+'</b>: no billed cost reported yet (Azure lags by hours to a day; subsidized or credit-covered usage can show as zero). Our estimate: '+b.estimated_total.toFixed(2)+'</div>';continue}
+  const c=b.currency+' ',gap=b.billed_on_estimated_days-b.estimated_on_billed_days;
+  h+='<div style="margin:.3rem 0"><b>'+p.name+'</b>: billed <b>'+c+b.billed_total.toFixed(2)+'</b> vs our estimate '+c+b.estimated_total.toFixed(2)+
+   '<br><span class=mut>On days with both: billed '+c+b.billed_on_estimated_days.toFixed(2)+', estimated '+c+b.estimated_on_billed_days.toFixed(2)+
+   ' ('+(gap>=0?'+':'')+gap.toFixed(2)+'). Azure reports cost with a delay of hours to a day.</span></div>'+
+   '<table><tr><th>Meter</th><th>Billed</th></tr>'+b.by_meter.slice(0,8).map(m=>'<tr><td>'+m.meter+'</td><td class=n>'+c+m.billed.toFixed(3)+'</td></tr>').join('')+'</table>'}
+ $('billing').innerHTML=h||'No profiles.'}
 async function load(){
  if(document.activeElement&&document.activeElement.tagName=='SELECT')return;
  if(!profilesLoaded){profilesLoaded=true;loadProfiles()}
+ if(!billingLoaded){billingLoaded=true;loadBilling()}
  const [o,u,d]=await Promise.all([j('/api'),j('/api/overview'),j('/api/deployments')]);
  $('kpis').innerHTML=[['Open sessions',u.sessions.filter(s=>s.open).length],
   ['Requests (24h)',fmt(u.requests_24h)],['Est. cost (24h)',usd(u.cost_24h)],
@@ -205,6 +219,13 @@ class Handler(BaseHTTPRequestHandler):
                     {"name": n, "prefix": p.label, "tenant": p.tenant_id, "account": p.account}
                     for n, p in load_profiles().items()
                 ]
+            elif url.path == "/api/billing":
+                profile = parse_qs(url.query).get("profile", [""])[0]
+                body = _cached(
+                    "bill:" + profile,
+                    900,  # Cost Management is rate limited and lags anyway
+                    lambda: billing.actual_cost(load_profiles()[profile]),
+                )
             elif url.path == "/api/catalog":
                 profile = parse_qs(url.query).get("profile", [""])[0]
                 body = _cached("cat:" + profile, 600, lambda: _catalog(profile))
