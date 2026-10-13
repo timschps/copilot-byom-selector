@@ -188,7 +188,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(json.dumps({"active": raw}))
         if self.path == "/api/deploy":
             req = json.loads(raw)
-            profile, name, item = req["profile"], req["name"], req["item"]
+            profile, item = req["profile"], req["item"]
+            name = req["name"].removeprefix(profile + "-")  # alias = <profile>-<deployment>
             if profile not in load_profiles() or item.get("format") != "OpenAI":
                 return self._send("unsupported", "text/plain", 400)
             _deploying[name] = "running"
