@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
+import time
 
 import typer
 
@@ -118,6 +121,40 @@ def status():
 
 
 @app.command()
+def pick():
+    """Choose the active model interactively (arrow keys)."""
+    import questionary
+
+    aliases = state.list_aliases()
+    if not aliases:
+        typer.echo("No models. Run 'byom sync' first.")
+        raise typer.Exit(1)
+    choice = questionary.select(
+        "Active model", choices=aliases, default=state.get_active() or aliases[0]
+    ).ask()
+    if choice:
+        state.set_active(choice)
+        typer.echo(f"Active model: {choice}")
+
+
+@app.command()
+def ui(open_browser: bool = typer.Option(True, "--open/--no-open")):
+    """Serve a local control page (http://127.0.0.1:4001) to view and switch the model."""
+    import webbrowser
+
+    from . import webui
+
+    url = f"http://127.0.0.1:{webui.PORT}"
+    typer.echo(f"Control page: {url} (Ctrl+C to stop)")
+    if open_browser:
+        webbrowser.open(url)
+    try:
+        webui.serve()
+    except KeyboardInterrupt:
+        pass
+
+
+@app.command()
 def mcp():
     """Run the MCP server (stdio) so Copilot can list and switch models."""
     from . import mcp_server
@@ -128,6 +165,11 @@ def mcp():
 @app.command()
 def serve():
     """Start the local LiteLLM gateway (fetches keys at start; nothing stored on disk)."""
+    cmd, kwargs = _gateway_command()
+    subprocess.run(cmd, check=False, **kwargs)
+
+
+def _gateway_command() -> tuple[list[str], dict]:
     cfg = home() / "litellm.config.yaml"
     if importlib.util.find_spec("litellm") is None:
         typer.echo('LiteLLM is not installed. Run: pip install "copilot-byom-selector[gateway]"')
@@ -139,21 +181,46 @@ def serve():
     env["PYTHONUTF8"] = "1"  # LiteLLM prints non-ASCII characters, which crash cp1252 consoles
     for p in load_profiles().values():
         env[gateway.env_name(p.name)] = foundry.get_key(p)
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "litellm.proxy.proxy_cli",
-            "--config",
-            str(cfg),
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(gateway.PORT),
-        ],
-        env=env,
-        check=False,
+    cmd = [
+        sys.executable,
+        "-m",
+        "litellm.proxy.proxy_cli",
+        "--config",
+        str(cfg),
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(gateway.PORT),
+    ]
+    return cmd, {"env": env}
+
+
+def _gateway_up() -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", gateway.PORT), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def _start_gateway() -> subprocess.Popen:
+    """Start the gateway hidden in the background; log to ~/.byom/gateway.log."""
+    cmd, kwargs = _gateway_command()
+    log = open(home() / "gateway.log", "ab")  # noqa: SIM115 - handle lives as long as the child
+    flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    proc = subprocess.Popen(
+        cmd, stdout=log, stderr=log, stdin=subprocess.DEVNULL, creationflags=flags, **kwargs
     )
+    typer.echo("Starting gateway...")
+    for _ in range(90):
+        if _gateway_up():
+            return proc
+        if proc.poll() is not None:
+            break
+        time.sleep(1)
+    proc.terminate()
+    typer.echo(f"Gateway failed to start. See {home() / 'gateway.log'}")
+    raise typer.Exit(1)
 
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -171,6 +238,10 @@ def copilot(
 ):
     """Launch Copilot CLI against the gateway with the given model alias (profile-deployment)."""
     exe = shutil.which("copilot")
+    extra = list(ctx.args)
+    if model_alias.startswith("-"):  # no alias given: this is already a Copilot option
+        extra.insert(0, model_alias)
+        model_alias = state.ACTIVE_ALIAS
     if not exe:
         typer.echo("copilot CLI not found on PATH")
         raise typer.Exit(1)
@@ -184,7 +255,29 @@ def copilot(
         lean_home = home() / "copilot-lean"
         lean_home.mkdir(exist_ok=True)
         env["COPILOT_HOME"] = str(lean_home)
-    raise typer.Exit(subprocess.call([exe, *ctx.args], env=env))
+    started = None if _gateway_up() else _start_gateway()
+    mcp_cfg = home() / "mcp.json"
+    mcp_cfg.write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "byom": {
+                        "type": "local",
+                        "command": sys.executable,
+                        "args": ["-m", "byom", "mcp"],
+                        "tools": ["*"],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    try:
+        code = subprocess.call([exe, "--additional-mcp-config", f"@{mcp_cfg}", *extra], env=env)
+    finally:
+        if started:
+            started.terminate()
+    raise typer.Exit(code)
 
 
 if __name__ == "__main__":

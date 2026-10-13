@@ -9,7 +9,11 @@ try:  # mcp >= 2
 except ImportError:  # mcp 1.x
     from mcp.server.fastmcp import FastMCP as _Server
 
-server = _Server("byom")
+server = _Server(
+    "byom",
+    instructions="Use these tools when the user asks which model is active, to list models, "
+    "or to switch model (e.g. 'switch to claude-haiku'). Match partial names to an alias.",
+)
 
 
 @server.tool()
